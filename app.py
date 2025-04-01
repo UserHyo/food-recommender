@@ -34,10 +34,7 @@ region_coords = {
     "대전": (36.3504, 127.3845),
     "광주": (35.1595, 126.8526),
     "제주": (33.4996, 126.5312),
-    "강릉": (37.7519, 128.8761),
-    "대구": (35.8722, 128.6025),
-    "수원": (37.2636, 127.0286),
-    "청주": (36.6424, 127.4890)
+    "강릉": (37.7519, 128.8761)
 }
 
 # 격자 변환 함수
@@ -75,14 +72,18 @@ def get_weather_data(region_name):
     Hugging Face에서는 SSL 에러로 인해 기상청 API 호출이 불가능하기 때문입니다.
     """
     # 예시: 지역별 간단한 Mock 데이터 (원하는 경우 확장 가능)
-    mock_weather_by_region = {
-        "서울": {"TA_AVG": 16.5, "HM_AVG": 60.0, "WS_AVG": 1.5, "RN_DAY": 0.0},
-        "부산": {"TA_AVG": 17.2, "HM_AVG": 65.0, "WS_AVG": 1.8, "RN_DAY": 0.1},
-        "광주": {"TA_AVG": 18.0, "HM_AVG": 58.0, "WS_AVG": 1.2, "RN_DAY": 0.0},
-        "대전": {"TA_AVG": 15.5, "HM_AVG": 63.0, "WS_AVG": 1.6, "RN_DAY": 0.2},
-        "제주": {"TA_AVG": 19.0, "HM_AVG": 70.0, "WS_AVG": 2.0, "RN_DAY": 0.3},
-        "강릉": {"TA_AVG": 14.8, "HM_AVG": 55.0, "WS_AVG": 1.7, "RN_DAY": 0.0}
-    }
+    region_coords = {
+    "서울": (37.5665, 126.9780),
+    "부산": (35.1796, 129.0756),
+    "대전": (36.3504, 127.3845),
+    "광주": (35.1595, 126.8526),
+    "제주": (33.4996, 126.5312),
+    "강릉": (37.7519, 128.8761),
+    "대구": (35.8722, 128.6025),
+    "수원": (37.2636, 127.0286),
+    "청주": (36.6424, 127.4890)
+}
+
 
     # 기본값 (지역이 없을 경우)
     return mock_weather_by_region.get(region_name, {
@@ -134,7 +135,15 @@ with col2:
 
 if st.button("🔍 추천받기"):
     weather = get_weather_data(region)
-    st.info(f"📡 '{region}' 지역 날씨: {weather}")
+    
+    # ✅ 날씨 요약 출력 (metric UI)
+    st.markdown("### ☁️ 오늘의 날씨")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("기온", f"{weather['TA_AVG']}°C")
+    col2.metric("습도", f"{weather['HM_AVG']}%")
+    col3.metric("풍속", f"{weather['WS_AVG']} m/s")
+    col4.metric("강수량", f"{weather['RN_DAY']} mm")
+
     X = preprocess_input(gender, age_group, region, weather, encoders, scalers)
 
     scores = {}
@@ -151,14 +160,14 @@ if st.button("🔍 추천받기"):
             "SideDish": "반찬류", "SoupStew": "찌개/국/탕", "StirFryGrill": "볶음/구이"
         }
         korean_group = category_map[best_group]
-        st.success(f"🍲 오늘은 '{korean_group}'이 가장 인기 있을 것 같아요!")
 
-        # 음식 추천
+        # ✅ 추천 음식 출력
         food_list = df_food[df_food["CKG_GROUP"] == korean_group]["CKG_NM"].dropna().unique()
         if len(food_list) > 0:
-            st.markdown("#### 🥢 추천 음식:")
-            for food in np.random.choice(food_list, size=min(5, len(food_list)), replace=False):
-                st.markdown(f"- {food}")
-
-        st.bar_chart(pd.Series(scores).sort_values(ascending=False))
-
+            st.markdown("### 🍽️ 오늘의 추천 음식")
+            cols = st.columns(len(food_list[:5]))  # 최대 5개
+            for col, food in zip(cols, np.random.choice(food_list, size=min(5, len(food_list)), replace=False)):
+                col.markdown(
+    f"<div style='font-size:16px; font-weight:500; text-align:center;'>🥢{food}</div>",
+    unsafe_allow_html=True
+)
