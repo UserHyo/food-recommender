@@ -71,31 +71,55 @@ API_KEY = "DEaTeAeMY+/ZCys9LTGzBk/MnsJg8VJSGr7h5yrG94i8/FSzVyxUgMsVAM1E3B4XEmYhi
 
 def get_weather_data(region_name):
     """
-    🔄 실제 기상청 API를 호출하지 않고,
-    지역명(region_name)에 따라 임시 날씨 데이터를 반환합니다.
-    Hugging Face에서는 SSL 에러로 인해 기상청 API 호출이 불가능하기 때문입니다.
+    기상청 API 호출로 실시간 날씨 정보 가져오기 (단기예보)
     """
-    # 예시: 지역별 간단한 Mock 데이터 (원하는 경우 확장 가능)
-    region_coords = {
-    "서울": (37.5665, 126.9780),
-    "부산": (35.1796, 129.0756),
-    "대전": (36.3504, 127.3845),
-    "광주": (35.1595, 126.8526),
-    "제주": (33.4996, 126.5312),
-    "강릉": (37.7519, 128.8761),
-    "대구": (35.8722, 128.6025),
-    "수원": (37.2636, 127.0286),
-    "청주": (36.6424, 127.4890)
-}
+    lat, lon = region_coords[region_name]
+    nx, ny = dfs_xy_conv(lat, lon)
 
+    base_time = "0500"  # 일반적으로 05시 or 11시가 예보 시간으로 많이 사용됨
+    base_date = datetime.today().strftime("%Y%m%d")
 
-    # 기본값 (지역이 없을 경우)
-    return mock_weather_by_region.get(region_name, {
-        "TA_AVG": 16.0,
-        "HM_AVG": 60.0,
-        "WS_AVG": 1.5,
-        "RN_DAY": 0.0
-    })
+    url = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+    params = {
+        "serviceKey": API_KEY,
+        "pageNo": 1,
+        "numOfRows": 1000,
+        "dataType": "JSON",
+        "base_date": base_date,
+        "base_time": base_time,
+        "nx": nx,
+        "ny": ny
+    }
+
+    response = requests.get(url, params=params)
+    items = response.json().get("response", {}).get("body", {}).get("items", {}).get("item", [])
+
+    weather = {
+        "TA_AVG": None,
+        "HM_AVG": None,
+        "WS_AVG": None,
+        "RN_DAY": 0.0  # 강수량은 없으면 0으로
+    }
+
+    # 카테고리별 데이터 추출
+    for item in items:
+        category = item.get("category")
+        fcst_value = item.get("fcstValue")
+
+        if category == "T1H":  # 기온
+            weather["TA_AVG"] = float(fcst_value)
+        elif category == "REH":  # 습도
+            weather["HM_AVG"] = float(fcst_value)
+        elif category == "WSD":  # 풍속
+            weather["WS_AVG"] = float(fcst_value)
+        elif category == "RN1":  # 1시간 강수량
+            try:
+                weather["RN_DAY"] = float(fcst_value)
+            except:
+                weather["RN_DAY"] = 0.0
+
+    return weather
+
 
 def preprocess_input(gender, age_group, region, weather, encoders, scalers):
     gender_enc = encoders["gender"].transform([gender])[0]
